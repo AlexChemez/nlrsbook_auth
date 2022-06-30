@@ -10,7 +10,7 @@
         <FIELD NAME="user_id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User ID"/>
         <FIELD NAME="sub" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Sub ID"/>
         <FIELD NAME="token" TYPE="text" LENGTH="" NOTNULL="true" SEQUENCE="false" COMMENT="User token"/>
-        <FIELD NAME="datetime" TYPE="datetime" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="Datetime"/>
+        <FIELD NAME="exp" TYPE="text" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="Datetime"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>

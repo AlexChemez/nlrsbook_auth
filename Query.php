@@ -14,14 +14,14 @@ class Query
     global $DB;
     $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
     if ($moduleinstance->token) {  
-      $today = date("Y-m-d H:i:s");
-      $date = $moduleinstance->exp;
-      if ($today < $date) {  
+      $today = strtotime(date("Y-m-d H:i:s"));
+      $expireDate = $moduleinstance->exp;
+      if ($today > $expireDate) {  
         $getToken = self::checkToken($user_id, $signature);
         $row->id = $moduleinstance->id;
         $row->user_id = $user_id;
         $row->token = $getToken;
-        $row->datetime = date("Y-m-d H:i:s", substr(self::jwt_decode($getToken)['exp'], 0, 10));
+        $row->exp = self::jwt_decode($getToken)['exp'];
         $row->sub = self::jwt_decode($getToken)['sub'];
         $DB->update_record('nlrsbook_auth', $row);
         return $getToken;
@@ -33,7 +33,7 @@ class Query
       $row = new \stdClass();
       $row->user_id = $user_id;
       $row->token = $getToken;
-      $row->datetime = date("Y-m-d H:i:s", substr(self::jwt_decode($getToken)['exp'], 0, 10));
+      $row->exp = self::jwt_decode($getToken)['exp'];
       $row->sub = self::jwt_decode($getToken)['sub'];
       $DB->insert_record('nlrsbook_auth', $row);
       return $getToken;
@@ -120,6 +120,50 @@ class Query
       $base64_decode = base64_decode($jwt['payload']);
       $json = json_decode($base64_decode, true);
       return $json;
+  }
+
+  public static function getBook($nlrsbook_id, $token) 
+  {
+      $query = '{ 
+          book(id: '.$nlrsbook_id.') {
+            id
+            coverThumbImage {
+              url
+              width
+              height
+            }
+            title
+            authors {
+              id
+              fullName
+            }
+            annotation
+            shortBibl
+            innerPagesCount
+            pubPlace
+            publisher
+            pubDate
+            is_on_shelf
+            isOnShelf
+        }
+      }';
+
+      $data = array ('query' => $query);
+      $data = http_build_query($data);
+
+      $options = array(
+        'http' => array(
+          'header' => sprintf("Authorization: Bearer %s", $token),
+          'method'  => 'POST',  
+          'content' => $data
+        )
+      );
+
+      $context  = stream_context_create($options);
+      $getContents = file_get_contents(sprintf(self::HOST), false, $context);
+      $json = json_decode($getContents, true);
+      if ($getContents === FALSE) { /* Handle error */ }
+      return $json['data']['book'];
   }
 
   public static function getShelf($page, $first, $token) 
