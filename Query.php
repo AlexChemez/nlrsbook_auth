@@ -57,7 +57,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header'  => sprintf("Authorization: Bearer %s", $signature),
+          'header'  => sprintf("X-signature: %s", $signature),
           'method'  => 'POST',  
           'content' => $data
         )
@@ -68,6 +68,12 @@ class Query
       $json = json_decode($getContents, true);
       if ($getContents === FALSE) { }
       return $json['data']['eduCheckIfLinkedNlrsAccountExistsAndGetToken']['token'];
+  }
+
+  public static function getSub($user_id) {
+    global $DB;
+    $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING ); 
+    return $moduleinstance->sub;
   }
 
   public static function createAccount($user_id, $signature) {
@@ -87,7 +93,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header'  => sprintf("Authorization: Bearer %s", $signature),
+          'header'  => sprintf("X-signature: %s", $signature),
           'method'  => 'POST',  
           'content' => $data
         )
@@ -100,15 +106,25 @@ class Query
       return $json['data']['eduCreateNewNlrsAccount']['token'];
   }
 
-  public static function generateServerApiRequestSignatureBase64($privateKey, $org_id, $user_id)
-  {
-    $payload = [
-        'orgId' => $org_id, 
-        'userIdInEduPlatform' => "${user_id}"
-    ];
-    $jwt = JWT::encode($payload, $privateKey, 'RS256');
-    $encode = self::base64url_encode($jwt);
-    return $encode;
+
+  public static function generateServerApiRequestSignature($payload, $secret)
+  {    
+    $dataToSign = implode(chr(0x0A), [
+        md5(json_encode($payload)),
+    ]);
+
+    $calculatedHmacSignature = hash_hmac('sha256', $dataToSign, $secret);
+    return $calculatedHmacSignature;
+  }
+
+  public static function generateServerApiRequestSignatureBase64($payload, $secret)
+  {    
+    $dataToSign = implode(chr(0x0A), [
+        md5(json_encode($payload)),
+    ]);
+
+    $calculatedHmacSignature = hash_hmac('sha256', $dataToSign, $secret);
+    return $calculatedHmacSignature;
   }
 
   protected static function base64url_encode( $data ){
