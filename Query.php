@@ -3,23 +3,21 @@ namespace App\Querys;
 
 require_once(__DIR__ . "/vendor/autoload.php");
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-
 class Query
 {
   const HOST = 'https://e.nlrs.ru/graphql';
 
-  public static function getToken($user_id, $signature) {
-    global $DB;
-    $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
+// Проверка и получение токена пользователя 
+  public static function getToken() {
+    global $DB, $USER;
+    $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $USER->id), '*', IGNORE_MISSING );
     if ($moduleinstance->token) {  
       $today = strtotime(date("Y-m-d H:i:s"));
       $expireDate = $moduleinstance->exp;
       if ($today > $expireDate) {  
-        $getToken = self::checkToken($user_id, $signature);
+        $getToken = self::checkToken($USER->id, self::generateServerApiRequestSignature());
         $row->id = $moduleinstance->id;
-        $row->user_id = $user_id;
+        $row->user_id = $USER->id;
         $row->token = $getToken;
         $row->exp = self::jwt_decode($getToken)['exp'];
         $row->sub = self::jwt_decode($getToken)['sub'];
@@ -29,9 +27,9 @@ class Query
         return $moduleinstance->token;
       }
     } else {
-      $getToken = self::createAccount($user_id, $signature);
+      $getToken = self::createAccount($USER->id, self::generateServerApiRequestSignature());
       $row = new \stdClass();
-      $row->user_id = $user_id;
+      $row->user_id = $USER->id;
       $row->token = $getToken;
       $row->exp = self::jwt_decode($getToken)['exp'];
       $row->sub = self::jwt_decode($getToken)['sub'];
@@ -40,6 +38,7 @@ class Query
     }
   }
 
+  // Проверка токена
   public static function checkToken($user_id, $signature) {
       $query = 'mutation {
         eduCheckIfLinkedNlrsAccountExistsAndGetToken(
@@ -70,12 +69,7 @@ class Query
       return $json['data']['eduCheckIfLinkedNlrsAccountExistsAndGetToken']['token'];
   }
 
-  public static function getSub($user_id) {
-    global $DB;
-    $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING ); 
-    return $moduleinstance->sub;
-  }
-
+  // Создание аккаунта
   public static function createAccount($user_id, $signature) {
       $query = 'mutation {
         eduCreateNewNlrsAccount(
@@ -106,29 +100,21 @@ class Query
       return $json['data']['eduCreateNewNlrsAccount']['token'];
   }
 
-
-  public static function generateServerApiRequestSignature($payload, $secret)
+  public static function generateServerApiRequestSignature()
   {    
+    global $USER;
+
+    $payload = [
+      "orgId" => 1,
+      "userIdInEduPlatform" => $USER->id,
+    ];
+    $secret = get_config('nlrsbook_auth', 'org_private_key'); // Секретный ключ организации
     $dataToSign = implode(chr(0x0A), [
         md5(json_encode($payload)),
     ]);
 
     $calculatedHmacSignature = hash_hmac('sha256', $dataToSign, $secret);
     return $calculatedHmacSignature;
-  }
-
-  public static function generateServerApiRequestSignatureBase64($payload, $secret)
-  {    
-    $dataToSign = implode(chr(0x0A), [
-        md5(json_encode($payload)),
-    ]);
-
-    $calculatedHmacSignature = hash_hmac('sha256', $dataToSign, $secret);
-    return $calculatedHmacSignature;
-  }
-
-  protected static function base64url_encode( $data ){
-      return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
   }
 
   protected static function jwt_decode($token){
@@ -138,7 +124,44 @@ class Query
       return $json;
   }
 
-  public static function getBook($nlrsbook_id, $token) 
+  // Создание подписи
+  public static function getSignature()
+  {    
+    global $USER;
+    $sub = self::getSub($USER->id);
+    $payload = [
+      "orgId" => 1,
+      "userIdInEduPlatform" => "${sub}",
+    ];
+    $secret = get_config('nlrsbook_auth', 'org_private_key'); // Секретный ключ организации
+    $dataToSign = implode(chr(0x0A), [
+        md5(json_encode($payload)),
+    ]);
+
+    $calculatedHmacSignature = hash_hmac('sha256', $dataToSign, $secret);
+    return $calculatedHmacSignature;
+  }
+
+// Получение чит. билета пользователя
+  public static function getSub($user_id) {
+    global $DB;
+    $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING ); 
+    return $moduleinstance->sub;
+  }
+
+// Формирование ссылки бесшовной авторизации
+  public static function getUrl($redirect)
+  {
+    global $USER;
+    $seamlessAuthOrgId = 1;
+    $nlrsUserId = self::getSub($USER->id);
+    $seamlessAuthSignature = self::getSignature();
+    $bookUrl = "https://e.nlrs.ru/seamless-auth-redirect?seamlessAuthOrgId=${seamlessAuthOrgId}&seamlessAuthUserId=${nlrsUserId}&seamlessAuthSignature=${seamlessAuthSignature}&override_redirect=${redirect}";
+    return $bookUrl;
+  }
+
+// Получнеие данных книги
+  public static function getBook($nlrsbook_id) 
   {
       $query = '{ 
           book(id: '.$nlrsbook_id.') {
@@ -169,7 +192,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header' => sprintf("Authorization: Bearer %s", $token),
+          'header' => sprintf("Authorization: Bearer %s", self::getToken()),
           'method'  => 'POST',  
           'content' => $data
         )
@@ -182,7 +205,8 @@ class Query
       return $json['data']['book'];
   }
 
-  public static function getShelf($page, $first, $token) 
+// Получнеие данных полки
+  public static function getShelf($page, $first) 
   {
       $query = 'query { 
           books(
@@ -209,7 +233,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header'  => sprintf("Authorization: Bearer %s", $token),
+          'header'  => sprintf("Authorization: Bearer %s", self::getToken()),
           'method'  => 'POST',  
           'content' => $data
         )
@@ -222,7 +246,8 @@ class Query
       return $json['data']['books'];
   }
 
-  public static function addBookToShelf($book_id, $token) {
+// Добавление книги на полку
+  public static function addBookToShelf($book_id) {
       $query = 'mutation {
         addBookToShelf(bookId: '.$book_id.') {
           title
@@ -235,7 +260,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header'  => sprintf("Authorization: Bearer %s", $token),
+          'header'  => sprintf("Authorization: Bearer %s", self::getToken()),
           'method'  => 'POST',  
           'content' => $data
         )
@@ -245,7 +270,8 @@ class Query
       $getContents = file_get_contents(sprintf(self::HOST), false, $context);
   }
 
-  public static function removeBookToShelf($book_id, $token) {
+// Удаление книги с полки
+  public static function removeBookToShelf($book_id) {
       $query = 'mutation {
         removeBookFromShelf(bookId: '.$book_id.') {
           title
@@ -258,7 +284,7 @@ class Query
 
       $options = array(
         'http' => array(
-          'header'  => sprintf("Authorization: Bearer %s", $token),
+          'header'  => sprintf("Authorization: Bearer %s", self::getToken()),
           'method'  => 'POST',  
           'content' => $data
         )
