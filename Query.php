@@ -1,8 +1,6 @@
 <?php
 namespace App\Querys;
 
-require_once(__DIR__ . "/vendor/autoload.php");
-
 class Query
 {
   const HOST = 'https://e.nlrs.ru/graphql';
