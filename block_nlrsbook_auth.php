@@ -17,20 +17,35 @@ class block_nlrsbook_auth extends block_base {
             return $this->content;
         }
 
-        $shelfUrl = Query::getUrl("https://nlrs.ru/lk/shelf");
-        $ordersShelfUrl = Query::getUrl("https://new.nlrs.ru/lk/orders-shelf");
-        $ticketsUrl = Query::getUrl("https://nlrs.ru/lk/tickets");
+        $setting = get_config('nlrsbook_auth', 'org_private_key'); // Секретный ключ организации
 
-        $this->content = new stdClass;
-        $this->content->text .= <<<HTML
-            <div>
-                <div class="mb-3">
-                    <a href="{$shelfUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-bookmark mr-2" aria-hidden="true"></i>Моя полка</a>
-                    <a href="{$ordersShelfUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-book mr-2" aria-hidden="true"></i>Мои заказы</a>
-                    <a href="{$ticketsUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-question-circle mr-2" aria-hidden="true"></i>Задать вопрос</a>
+        if ($setting) {
+            $shelfUrl = Query::getUrl("https://nlrs.ru/lk/shelf");
+            $ordersShelfUrl = Query::getUrl("https://new.nlrs.ru/lk/orders-shelf");
+            $ticketsUrl = Query::getUrl("https://nlrs.ru/lk/tickets");
+
+            $this->content = new stdClass;
+            $this->content->text .= <<<HTML
+                <div>
+                    <div class="mb-3">
+                        <a href="{$shelfUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-bookmark mr-2" aria-hidden="true"></i>Моя полка</a>
+                        <a href="{$ordersShelfUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-book mr-2" aria-hidden="true"></i>Мои заказы</a>
+                        <a href="{$ticketsUrl}" target="_blank" class="nlrsbook_shelf_card__btn btn btn-primary mb-1"><i class="fa fa-question-circle mr-2" aria-hidden="true"></i>Задать вопрос</a>
+                    </div>
                 </div>
-            </div>
-        HTML;
+            HTML;
+        } else {
+            $this->content = new stdClass;
+            $this->content->text .= <<<HTML
+                <div class="row">
+                    <div class="col-sm-12">
+                        <div class="alert alert-warning">
+                            Плагин не настроен. Обратитесь к администратору образовательного учреждения.
+                        </div>
+                    </div>
+                </div>
+            HTML;
+        }
 
         return $this->content;
     }
@@ -39,5 +54,5 @@ class block_nlrsbook_auth extends block_base {
     {
         return true;
     }
-
+    
 }
