@@ -9,35 +9,31 @@ class Query
   public static function getToken() {
     global $DB, $USER;
     $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $USER->id), '*', IGNORE_MISSING );
-    if ($moduleinstance->token) {  
-      $today = strtotime(date("Y-m-d H:i:s"));
-      $expireDate = $moduleinstance->exp;
-      if ($today > $expireDate) {  
-        $getToken = self::checkToken($USER->id, self::generateServerApiRequestSignature());
-        $row->id = $moduleinstance->id;
-        $row->user_id = $USER->id;
-        $row->token = $getToken;
-        $row->exp = self::jwt_decode($getToken)['exp'];
-        $row->sub = self::jwt_decode($getToken)['sub'];
-        $DB->update_record('nlrsbook_auth', $row);
-        return $getToken;
+      if ($moduleinstance) {
+        $today = strtotime(date("Y-m-d H:i:s"));
+        $expireDate = $moduleinstance->exp;
+        if ($today > $expireDate) {  
+          $getToken = self::checkToken();
+          $row->id = $moduleinstance->id;
+          $row->user_id = $USER->id;
+          $row->token = $getToken;
+          $row->exp = self::jwt_decode($getToken)['exp'];
+          $row->sub = self::jwt_decode($getToken)['sub'];
+          $DB->update_record('nlrsbook_auth', $row);
+          return $getToken;
+        } else {
+          return $moduleinstance->token;
+        }
       } else {
-        return $moduleinstance->token;
+        return null;
       }
-    } else {
-      $getToken = self::createAccount($USER->id, self::generateServerApiRequestSignature());
-      $row = new \stdClass();
-      $row->user_id = $USER->id;
-      $row->token = $getToken;
-      $row->exp = self::jwt_decode($getToken)['exp'];
-      $row->sub = self::jwt_decode($getToken)['sub'];
-      $DB->insert_record('nlrsbook_auth', $row);
-      return $getToken;
-    }
   }
 
   // Проверка токена
-  public static function checkToken($user_id, $signature) {
+  public static function checkToken() {
+      global $USER;
+      $user_id = $USER->id;
+      $signature = self::generateServerApiRequestSignature();
       $query = 'mutation {
         eduCheckIfLinkedNlrsAccountExistsAndGetToken(
           input: { 
@@ -67,8 +63,59 @@ class Query
       return $json['data']['eduCheckIfLinkedNlrsAccountExistsAndGetToken']['token'];
   }
 
+
+  // Связь с аккаунтом НБ
+  public static function nlrsConnect($login, $password) {
+      global $DB, $USER;
+      $user_id = $USER->id;
+      $signature = self::generateServerApiRequestSignature();
+      $query = 'mutation {
+        eduLinkExistingNlrsAccount(
+          input: { 
+              orgId: 1, 
+              userIdInEduPlatform: "'.$user_id.'" 
+              libraryCardNumberOrEmail: "'.$login.'" 
+              password: "'.$password.'" 
+          }
+        ) {
+          token
+        }
+      }';
+      $data = array ('query' => $query);
+      $data = http_build_query($data);
+
+      $options = array(
+        'http' => array(
+          'header'  => sprintf("X-signature: %s", $signature),
+          'method'  => 'POST',  
+          'content' => $data
+        )
+      );
+
+      $context  = stream_context_create($options);
+      $getContents = file_get_contents(sprintf(self::HOST), false, $context);
+      $json = json_decode($getContents, true);
+      if ($getContents === FALSE) { }
+
+      $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
+      $json_token = $json['data']['eduLinkExistingNlrsAccount']['token'];
+      if (empty($moduleinstance)) {
+        $row = new \stdClass();
+        $row->user_id = $user_id;
+        $row->token = $json_token;
+        $row->exp = self::jwt_decode($json_token)['exp'];
+        $row->sub = self::jwt_decode($json_token)['sub'];
+        $DB->insert_record('nlrsbook_auth', $row);
+      }
+
+      return $json;
+  }
+
   // Создание аккаунта
-  public static function createAccount($user_id, $signature) {
+  public static function createAccount() {
+      global $DB, $USER;
+      $user_id = $USER->id;
+      $signature = self::generateServerApiRequestSignature();
       $query = 'mutation {
         eduCreateNewNlrsAccount(
           input: {
@@ -95,9 +142,21 @@ class Query
       $getContents = file_get_contents(sprintf(self::HOST), false, $context);
       $json = json_decode($getContents, true);
       if ($getContents === FALSE) { }
+
+      $json_token = $json['data']['eduCreateNewNlrsAccount']['token'];
+      $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
+      if (empty($moduleinstance)) {
+        $row = new \stdClass();
+        $row->user_id = $user_id;
+        $row->token = $json_token;
+        $row->exp = self::jwt_decode($json_token)['exp'];
+        $row->sub = self::jwt_decode($json_token)['sub'];
+        $DB->insert_record('nlrsbook_auth', $row);
+      }
       return $json['data']['eduCreateNewNlrsAccount']['token'];
   }
 
+  // Создание подписи организации
   public static function generateServerApiRequestSignature()
   {    
     global $USER;
@@ -115,6 +174,7 @@ class Query
     return $calculatedHmacSignature;
   }
 
+  // Расшифроква JWT
   protected static function jwt_decode($token){
       $jwt = array_combine(['header', 'payload', 'signature'], explode('.', $token));
       $base64_decode = base64_decode($jwt['payload']);
@@ -122,7 +182,7 @@ class Query
       return $json;
   }
 
-  // Создание подписи
+  // Создание подписи пользователя
   public static function getSignature()
   {    
     global $USER;
@@ -140,14 +200,14 @@ class Query
     return $calculatedHmacSignature;
   }
 
-// Получение чит. билета пользователя
+  // Получение идентификатора пользователя
   public static function getSub($user_id) {
     global $DB;
     $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING ); 
     return $moduleinstance->sub;
   }
 
-// Формирование ссылки бесшовной авторизации
+  // Формирование ссылки бесшовной авторизации
   public static function getUrl($redirect)
   {
     global $USER;
@@ -158,7 +218,7 @@ class Query
     return $bookUrl;
   }
 
-// Получнеие данных книги
+  // Получение данных книги
   public static function getBook($nlrsbook_id) 
   {
       $query = '{ 
@@ -203,7 +263,7 @@ class Query
       return $json['data']['book'];
   }
 
-// Получнеие данных полки
+  // Получнеие данных полки
   public static function getShelf($page, $first) 
   {
       $query = 'query { 
@@ -244,7 +304,7 @@ class Query
       return $json['data']['books'];
   }
 
-// Добавление книги на полку
+  // Добавление книги на полку
   public static function addBookToShelf($book_id) {
       $query = 'mutation {
         addBookToShelf(bookId: '.$book_id.') {
@@ -268,7 +328,7 @@ class Query
       $getContents = file_get_contents(sprintf(self::HOST), false, $context);
   }
 
-// Удаление книги с полки
+  // Удаление книги с полки
   public static function removeBookToShelf($book_id) {
       $query = 'mutation {
         removeBookFromShelf(bookId: '.$book_id.') {
