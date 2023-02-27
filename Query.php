@@ -118,7 +118,7 @@ class Query
   // Создание аккаунта
   public static function createAccount() {
       global $DB, $USER;
-      $id = $USER->id;
+      $user_id = $USER->id;
       $email = $USER->email;
       $firstname = $USER->firstname;
       $lastname = $USER->lastname;
@@ -128,7 +128,7 @@ class Query
         eduCreateNewNlrsAccount(
           input: {
             orgId: 1
-            userIdInEduPlatform: "'.$id.'"
+            userIdInEduPlatform: "'.$user_id.'"
             email: "'.$email.'"
             name: "'.$firstname.'"
             surname: "'.$lastname.'"
