@@ -1,0 +1,21 @@
+.nlrsbook_auth {
+    container-name: nlrsauth;
+    container-type: inline-size;
+}
+.nlrsbook_auth__btn {
+    width: auto;
+}
+.hidden-alert {
+    margin-bottom: 20px;
+    color: red;
+}
+.hidden-success {
+    margin-bottom: 20px;
+    color: green;
+}
+@container nlrsauth (width < 450px) {
+    .nlrsbook_auth__btn {
+        width: 100%;
+        text-align: left;
+    }
+}
