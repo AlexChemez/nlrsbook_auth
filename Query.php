@@ -118,13 +118,20 @@ class Query
   // Создание аккаунта
   public static function createAccount() {
       global $DB, $USER;
-      $user_id = $USER->id;
+      $id = $USER->id;
+      $email = $USER->email;
+      $firstname = $USER->firstname;
+      $lastname = $USER->lastname;
+
       $signature = self::generateServerApiRequestSignature();
       $query = 'mutation {
         eduCreateNewNlrsAccount(
           input: {
             orgId: 1
-            userIdInEduPlatform: "'.$user_id.'"
+            userIdInEduPlatform: "'.$id.'"
+            email: "'.$email.'"
+            name: "'.$firstname.'"
+            surname: "'.$lastname.'"
           }
         ) {
           token
