@@ -45,7 +45,7 @@ $style = file_get_contents($CFG->dirroot . "/blocks/nlrsbook_auth/style/nlrsbook
 $template = '
             <style>'.$style.'</style>
             <div class="row my-5">
-                <div class="col-sm-12 mb-3">Вы можете войти в уже существуюший аккаунт НБ РС(Я) лиюо создать новый аккаунт.</div>
+                <div class="col-sm-12 mb-3">Вы можете войти в уже существуюший аккаунт НБ РС(Я) либо создать новый аккаунт.</div>
                 <div class="col-sm-12 col-md-6">
                     <form method="post">
                         <div class="form-group">
