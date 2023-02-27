@@ -97,15 +97,19 @@ class Query
       $json = json_decode($getContents, true);
       if ($getContents === FALSE) { }
 
-      $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
       $json_token = $json['data']['eduLinkExistingNlrsAccount']['token'];
-      if (empty($moduleinstance)) {
-        $row = new \stdClass();
-        $row->user_id = $user_id;
-        $row->token = $json_token;
-        $row->exp = self::jwt_decode($json_token)['exp'];
-        $row->sub = self::jwt_decode($json_token)['sub'];
-        $DB->insert_record('nlrsbook_auth', $row);
+      $error = $json['errors'][0]['message'];
+
+      $moduleinstance = $DB->get_record('nlrsbook_auth', array('user_id' => $user_id), '*', IGNORE_MISSING );
+      if (empty($error)) {
+        if (empty($moduleinstance)) {
+          $row = new \stdClass();
+          $row->user_id = $user_id;
+          $row->token = $json_token;
+          $row->exp = self::jwt_decode($json_token)['exp'];
+          $row->sub = self::jwt_decode($json_token)['sub'];
+          $DB->insert_record('nlrsbook_auth', $row);
+        }
       }
 
       return $json;

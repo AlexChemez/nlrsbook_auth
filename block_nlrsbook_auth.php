@@ -24,7 +24,7 @@ class block_nlrsbook_auth extends block_base {
         if ($setting) {
             if (Query::getToken()) {
                 $shelfUrl = Query::getUrl("https://nlrs.ru/lk/shelf");
-                $ordersShelfUrl = Query::getUrl("https://new.nlrs.ru/lk/orders-shelf");
+                $ordersShelfUrl = Query::getUrl("https://new.nlrs.ru/lk/digitization");
                 $ticketsUrl = Query::getUrl("https://nlrs.ru/lk/tickets");
                 $style = file_get_contents($CFG->dirroot . "/blocks/nlrsbook_auth/style/nlrsbook_auth.css");
 
@@ -32,7 +32,7 @@ class block_nlrsbook_auth extends block_base {
                         <style>{$style}</style>
                         <div class="nlrsbook_auth mb-3">
                             <a href="{$shelfUrl}" target="_blank" class="nlrsbook_auth__btn btn btn-lg btn-primary mb-1"><i class="fa fa-bookmark mr-2" aria-hidden="true"></i>Моя полка</a>
-                            <a href="{$ordersShelfUrl}" target="_blank" class="nlrsbook_auth__btn btn btn-lg btn-primary mb-1"><i class="fa fa-book mr-2" aria-hidden="true"></i>Мои заказы</a>
+                            <a href="{$ordersShelfUrl}" target="_blank" class="nlrsbook_auth__btn btn btn-lg btn-primary mb-1"><i class="fa fa-book mr-2" aria-hidden="true"></i>Заказы на оцифровку</a>
                             <a href="{$ticketsUrl}" target="_blank" class="nlrsbook_auth__btn btn btn-lg btn-primary mb-1"><i class="fa fa-question-circle mr-2" aria-hidden="true"></i>Задать вопрос</a>
                         </div>            
                 HTML;
